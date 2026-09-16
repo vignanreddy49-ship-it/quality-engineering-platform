@@ -1,0 +1,73 @@
+name: NFR Regression Gate
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'tests/performance/**'
+      - 'tests/security/**'
+      - 'tests/observability/**'
+      - '.github/workflows/nfr-regression-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'tests/performance/**'
+      - 'tests/security/**'
+      - 'tests/observability/**'
+      - '.github/workflows/nfr-regression-gate.yml'
+
+jobs:
+  regression-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install API and test dependencies
+        run: |
+          pip install -r apps/api/requirements.txt
+          pip install pytest==8.3.4 httpx==0.27.2
+      - name: Run security and observability regressions
+        run: pytest -q tests/security tests/observability
+
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install API dependencies
+        run: pip install -r apps/api/requirements.txt
+      - name: Start API
+        run: |
+          nohup uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 > /tmp/shopsphere.log 2>&1 &
+          for i in {1..20}; do curl --fail http://127.0.0.1:8000/health && break || sleep 1; done
+      - name: Run k6 order flow
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: tests/performance/k6-order-flow.js
+        env:
+          BASE_URL: http://127.0.0.1:8000
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install API dependencies
+        run: pip install -r apps/api/requirements.txt
+      - name: Start API
+        run: |
+          nohup uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 > /tmp/shopsphere.log 2>&1 &
+          for i in {1..20}; do curl --fail http://127.0.0.1:8000/health && break || sleep 1; done
+      - name: OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: 'http://127.0.0.1:8000/openapi.json'
+          allow_issue_writing: false
+          fail_action: false
