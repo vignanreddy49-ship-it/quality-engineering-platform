@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/payments/authorize",
+    "bodyPatterns": [
+      {"matchesJsonPath": "$.order_id"},
+      {"matchesJsonPath": "$.amount"}
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {"Content-Type": "application/json"},
+    "jsonBody": {
+      "authorization_id": "auth-1001",
+      "status": "AUTHORIZED"
+    },
+    "fixedDelayMilliseconds": 150
+  }
+}
