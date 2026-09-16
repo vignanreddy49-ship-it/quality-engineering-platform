@@ -8,11 +8,11 @@ from opentelemetry import trace
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SimpleSpanProcessor
 
 
 def configure_tracing() -> TracerProvider:
-    """Configure a local-safe tracer provider; OTLP can be enabled via env vars."""
+    """Configure tracing with console output locally and optional OTLP export."""
     provider = TracerProvider(
         resource=Resource.create(
             {
@@ -22,9 +22,12 @@ def configure_tracing() -> TracerProvider:
             }
         )
     )
-
-    exporter = ConsoleSpanExporter()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if endpoint:
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True)))
+    else:
+        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
     trace.set_tracer_provider(provider)
     return provider
 
@@ -41,7 +44,7 @@ def inject_trace_headers(headers: dict[str, str] | None = None) -> dict[str, str
 
 
 def extract_trace_headers(headers: dict[str, str] | None = None):
-    """Extract W3C trace context from a Kafka/HTTP-style header map."""
+    """Extract W3C trace context from a string Kafka/HTTP-style header map."""
     return extract(dict(headers or {}))
 
 
