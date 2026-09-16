@@ -124,5 +124,12 @@ def get_order(order_id: str):
 def events():
     """Test-only endpoint for inspecting events when memory publishing is enabled."""
     if isinstance(publisher, InMemoryEventPublisher):
-        return {"events": publisher.events, "headers": publisher.headers}
+        return publisher.events
+    return {"mode": "kafka", "topic": "orders"}
+
+@app.get("/api/event-headers")
+def event_headers():
+    """Test-only endpoint for inspecting propagated event headers."""
+    if isinstance(publisher, InMemoryEventPublisher):
+        return publisher.headers
     return {"mode": "kafka", "topic": "orders"}
