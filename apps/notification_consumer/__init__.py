@@ -1,0 +1,1 @@
+"""ShopSphere notification consumer package."""
