@@ -3,7 +3,14 @@ from pydantic import BaseModel, Field
 from typing import List
 from uuid import uuid4
 
-app = FastAPI(title="ShopSphere API", version="0.1.0")
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+except ImportError:  # pragma: no cover - keeps the app usable without observability deps
+    Instrumentator = None
+
+from apps.api.events import build_order_created_event
+
+app = FastAPI(title="ShopSphere API", version="0.2.0")
 
 PRODUCTS = [
     {"id": "p-100", "name": "Wireless Headphones", "price": 7999.0, "stock": 25},
@@ -12,6 +19,7 @@ PRODUCTS = [
 ]
 
 ORDERS = {}
+EVENTS = []
 
 class OrderItem(BaseModel):
     product_id: str
@@ -58,6 +66,7 @@ def create_order(request: OrderRequest):
         "status": "CREATED",
     }
     ORDERS[order_id] = order
+    EVENTS.append(build_order_created_event(order))
     return order
 
 @app.get("/api/orders/{order_id}")
@@ -66,3 +75,11 @@ def get_order(order_id: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
+
+@app.get("/api/events")
+def events():
+    """Test-only event inspection endpoint for local integration tests."""
+    return EVENTS
+
+if Instrumentator:
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
