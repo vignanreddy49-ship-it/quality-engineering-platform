@@ -1,12 +1,8 @@
-from fastapi import FastAPI, HTTPException
+import time
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from typing import List
 from uuid import uuid4
-
-try:
-    from prometheus_fastapi_instrumentator import Instrumentator
-except ImportError:  # pragma: no cover - keeps the app usable without observability deps
-    Instrumentator = None
 
 from apps.api.events import build_order_created_event
 
@@ -20,6 +16,8 @@ PRODUCTS = [
 
 ORDERS = {}
 EVENTS = []
+REQUEST_COUNT = {}
+REQUEST_DURATION = {}
 
 class OrderItem(BaseModel):
     product_id: str
@@ -29,9 +27,38 @@ class OrderRequest(BaseModel):
     customer_email: str
     items: List[OrderItem] = Field(min_length=1)
 
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    key = (request.method, request.url.path, response.status_code)
+    REQUEST_COUNT[key] = REQUEST_COUNT.get(key, 0) + 1
+    REQUEST_DURATION[key] = REQUEST_DURATION.get(key, 0.0) + (time.perf_counter() - started)
+    return response
+
 @app.get("/health")
 def health():
     return {"status": "UP", "service": "shopsphere-api"}
+
+@app.get("/metrics")
+def metrics():
+    lines = [
+        "# HELP shopsphere_http_requests_total Total HTTP requests handled by ShopSphere.",
+        "# TYPE shopsphere_http_requests_total counter",
+    ]
+    for (method, path, status), count in REQUEST_COUNT.items():
+        lines.append(
+            f'shopsphere_http_requests_total{{method="{method}",path="{path}",status="{status}"}} {count}'
+        )
+    lines += [
+        "# HELP shopsphere_http_request_duration_seconds_total Total request duration in seconds.",
+        "# TYPE shopsphere_http_request_duration_seconds_total counter",
+    ]
+    for (method, path, status), duration in REQUEST_DURATION.items():
+        lines.append(
+            f'shopsphere_http_request_duration_seconds_total{{method="{method}",path="{path}",status="{status}"}} {duration}'
+        )
+    return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 
 @app.get("/api/products")
 def products():
@@ -80,6 +107,3 @@ def get_order(order_id: str):
 def events():
     """Test-only event inspection endpoint for local integration tests."""
     return EVENTS
-
-if Instrumentator:
-    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
