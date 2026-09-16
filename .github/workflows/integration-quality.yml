@@ -1,0 +1,33 @@
+name: Integration Quality
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'apps/notification_consumer/**'
+      - 'tests/contracts/**'
+      - 'tests/events/**'
+      - 'tests/integration-testcontainers/**'
+      - '.github/workflows/integration-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'apps/notification_consumer/**'
+      - 'tests/contracts/**'
+      - 'tests/events/**'
+      - 'tests/integration-testcontainers/**'
+      - '.github/workflows/integration-quality.yml'
+
+jobs:
+  kafka-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install integration dependencies
+        run: pip install -r tests/integration-testcontainers/requirements.txt
+      - name: Run Kafka integration tests
+        run: pytest -q tests/integration-testcontainers -m integration
