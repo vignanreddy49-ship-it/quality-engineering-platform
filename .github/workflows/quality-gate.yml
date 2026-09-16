@@ -19,8 +19,8 @@ jobs:
         run: |
           nohup uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 > /tmp/shopsphere.log 2>&1 &
           sleep 3
-      - name: Run API tests
-        run: pytest -q tests/api-python
+      - name: Run API and observability tests
+        run: pytest -q tests/api-python tests/observability
 
   playwright-smoke:
     runs-on: ubuntu-latest
