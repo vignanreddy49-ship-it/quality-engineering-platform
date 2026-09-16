@@ -1,0 +1,39 @@
+name: Contract and Virtualization Quality
+
+on:
+  pull_request:
+    paths:
+      - 'tests/contract-pact/**'
+      - 'tests/service-virtualization/**'
+      - '.github/workflows/contract-virtualization-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/contract-pact/**'
+      - 'tests/service-virtualization/**'
+      - '.github/workflows/contract-virtualization-quality.yml'
+
+jobs:
+  pact-consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Pact dependencies
+        run: pip install -r tests/contract-pact/requirements.txt
+      - name: Run consumer contract
+        run: pytest -q tests/contract-pact
+
+  wiremock-virtualization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install virtualization dependencies
+        run: pip install -r tests/service-virtualization/requirements.txt
+      - name: Run WireMock scenarios
+        run: pytest -q tests/service-virtualization
