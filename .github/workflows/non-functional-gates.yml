@@ -1,0 +1,65 @@
+name: Non-Functional Quality Gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  security-zap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install API dependencies
+        run: pip install -r apps/api/requirements.txt
+      - name: Start API
+        run: |
+          nohup uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 > /tmp/shopsphere.log 2>&1 &
+          sleep 3
+      - name: OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: 'http://127.0.0.1:8000/openapi.json'
+          allow_issue_writing: false
+          fail_action: false
+
+  performance-k6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install API dependencies
+        run: pip install -r apps/api/requirements.txt
+      - name: Start API
+        run: |
+          nohup uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 > /tmp/shopsphere.log 2>&1 &
+          sleep 3
+      - name: Run k6 baseline
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: tests/performance/k6-baseline.js
+        env:
+          BASE_URL: http://127.0.0.1:8000
+
+  observability-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install API dependencies
+        run: pip install -r apps/api/requirements.txt
+      - name: Start API
+        run: |
+          nohup uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 > /tmp/shopsphere.log 2>&1 &
+          sleep 3
+      - name: Verify Prometheus endpoint
+        run: |
+          curl --fail http://127.0.0.1:8000/metrics | tee /tmp/metrics.txt
+          grep -q 'shopsphere_http_requests_total' /tmp/metrics.txt
