@@ -6,7 +6,9 @@ on:
       - 'apps/notification_consumer/**'
       - 'apps/api/event_publisher.py'
       - 'apps/api/events.py'
+      - 'apps/api/observability.py'
       - 'tests/events/**'
+      - 'tests/observability/**'
       - '.github/workflows/kafka-consumer-quality.yml'
   push:
     branches: [main]
@@ -14,7 +16,9 @@ on:
       - 'apps/notification_consumer/**'
       - 'apps/api/event_publisher.py'
       - 'apps/api/events.py'
+      - 'apps/api/observability.py'
       - 'tests/events/**'
+      - 'tests/observability/**'
       - '.github/workflows/kafka-consumer-quality.yml'
 
 jobs:
@@ -26,6 +30,6 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: pip install -r apps/api/requirements.txt pytest==8.3.4 jsonschema==4.23.0
-      - name: Run event and consumer tests
-        run: pytest -q tests/events
+        run: pip install -r apps/api/requirements.txt -r apps/notification_consumer/requirements.txt pytest==8.3.4 jsonschema==4.23.0
+      - name: Run event, consumer and trace tests
+        run: pytest -q tests/events tests/observability

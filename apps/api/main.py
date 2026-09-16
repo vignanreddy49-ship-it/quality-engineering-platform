@@ -1,13 +1,17 @@
 import time
 from fastapi import FastAPI, HTTPException, Request, Response
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel, Field
 from typing import List
 from uuid import uuid4
 
 from apps.api.events import build_order_created_event
 from apps.api.event_publisher import create_event_publisher, InMemoryEventPublisher
+from apps.api.observability import configure_tracing, traced_operation
 
-app = FastAPI(title="ShopSphere API", version="0.3.0")
+configure_tracing()
+app = FastAPI(title="ShopSphere API", version="0.4.0")
+FastAPIInstrumentor.instrument_app(app)
 
 PRODUCTS = [
     {"id": "p-100", "name": "Wireless Headphones", "price": 7999.0, "stock": 25},
@@ -27,6 +31,14 @@ class OrderItem(BaseModel):
 class OrderRequest(BaseModel):
     customer_email: str
     items: List[OrderItem] = Field(min_length=1)
+
+@app.middleware("http")
+async def correlation_middleware(request: Request, call_next):
+    correlation_id = request.headers.get("X-Request-ID") or str(uuid4())
+    request.state.correlation_id = correlation_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = correlation_id
+    return response
 
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
@@ -70,28 +82,36 @@ def product(product_id: str):
 
 @app.post("/api/orders", status_code=201)
 def create_order(request: OrderRequest):
-    total = 0.0
-    normalized = []
-    for item in request.items:
-        product = next((p for p in PRODUCTS if p["id"] == item.product_id), None)
-        if not product:
-            raise HTTPException(status_code=400, detail=f"Unknown product: {item.product_id}")
-        if item.quantity > product["stock"]:
-            raise HTTPException(status_code=409, detail="Insufficient stock")
-        total += product["price"] * item.quantity
-        normalized.append({"product_id": item.product_id, "quantity": item.quantity})
+    with traced_operation(
+        "shopsphere.order.create",
+        {"shopsphere.correlation_id": request.state.correlation_id},
+    ) as span:
+        total = 0.0
+        normalized = []
+        for item in request.items:
+            product = next((p for p in PRODUCTS if p["id"] == item.product_id), None)
+            if not product:
+                raise HTTPException(status_code=400, detail=f"Unknown product: {item.product_id}")
+            if item.quantity > product["stock"]:
+                raise HTTPException(status_code=409, detail="Insufficient stock")
+            total += product["price"] * item.quantity
+            normalized.append({"product_id": item.product_id, "quantity": item.quantity})
 
-    order_id = f"o-{uuid4().hex[:8]}"
-    order = {
-        "id": order_id,
-        "customer_email": request.customer_email,
-        "items": normalized,
-        "total": round(total, 2),
-        "status": "CREATED",
-    }
-    ORDERS[order_id] = order
-    publisher.publish(build_order_created_event(order))
-    return order
+        order_id = f"o-{uuid4().hex[:8]}"
+        order = {
+            "id": order_id,
+            "customer_email": request.customer_email,
+            "items": normalized,
+            "total": round(total, 2),
+            "status": "CREATED",
+        }
+        span.set_attribute("shopsphere.order_id", order_id)
+        ORDERS[order_id] = order
+        publisher.publish(
+            build_order_created_event(order),
+            headers={"x-correlation-id": request.state.correlation_id},
+        )
+        return order
 
 @app.get("/api/orders/{order_id}")
 def get_order(order_id: str):
@@ -105,4 +125,11 @@ def events():
     """Test-only endpoint for inspecting events when memory publishing is enabled."""
     if isinstance(publisher, InMemoryEventPublisher):
         return publisher.events
+    return {"mode": "kafka", "topic": "orders"}
+
+@app.get("/api/event-headers")
+def event_headers():
+    """Test-only endpoint for inspecting propagated event headers."""
+    if isinstance(publisher, InMemoryEventPublisher):
+        return publisher.headers
     return {"mode": "kafka", "topic": "orders"}
