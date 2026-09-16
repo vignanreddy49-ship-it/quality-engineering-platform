@@ -1,0 +1,31 @@
+name: Kafka Consumer Quality
+
+on:
+  pull_request:
+    paths:
+      - 'apps/notification_consumer/**'
+      - 'apps/api/event_publisher.py'
+      - 'apps/api/events.py'
+      - 'tests/events/**'
+      - '.github/workflows/kafka-consumer-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/notification_consumer/**'
+      - 'apps/api/event_publisher.py'
+      - 'apps/api/events.py'
+      - 'tests/events/**'
+      - '.github/workflows/kafka-consumer-quality.yml'
+
+jobs:
+  consumer-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r apps/api/requirements.txt pytest==8.3.4 jsonschema==4.23.0
+      - name: Run event and consumer tests
+        run: pytest -q tests/events

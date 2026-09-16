@@ -5,8 +5,9 @@ from typing import List
 from uuid import uuid4
 
 from apps.api.events import build_order_created_event
+from apps.api.event_publisher import create_event_publisher, InMemoryEventPublisher
 
-app = FastAPI(title="ShopSphere API", version="0.2.0")
+app = FastAPI(title="ShopSphere API", version="0.3.0")
 
 PRODUCTS = [
     {"id": "p-100", "name": "Wireless Headphones", "price": 7999.0, "stock": 25},
@@ -15,7 +16,7 @@ PRODUCTS = [
 ]
 
 ORDERS = {}
-EVENTS = []
+publisher = create_event_publisher()
 REQUEST_COUNT = {}
 REQUEST_DURATION = {}
 
@@ -47,17 +48,13 @@ def metrics():
         "# TYPE shopsphere_http_requests_total counter",
     ]
     for (method, path, status), count in REQUEST_COUNT.items():
-        lines.append(
-            f'shopsphere_http_requests_total{{method="{method}",path="{path}",status="{status}"}} {count}'
-        )
+        lines.append(f'shopsphere_http_requests_total{{method="{method}",path="{path}",status="{status}"}} {count}')
     lines += [
         "# HELP shopsphere_http_request_duration_seconds_total Total request duration in seconds.",
         "# TYPE shopsphere_http_request_duration_seconds_total counter",
     ]
     for (method, path, status), duration in REQUEST_DURATION.items():
-        lines.append(
-            f'shopsphere_http_request_duration_seconds_total{{method="{method}",path="{path}",status="{status}"}} {duration}'
-        )
+        lines.append(f'shopsphere_http_request_duration_seconds_total{{method="{method}",path="{path}",status="{status}"}} {duration}')
     return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 
 @app.get("/api/products")
@@ -93,7 +90,7 @@ def create_order(request: OrderRequest):
         "status": "CREATED",
     }
     ORDERS[order_id] = order
-    EVENTS.append(build_order_created_event(order))
+    publisher.publish(build_order_created_event(order))
     return order
 
 @app.get("/api/orders/{order_id}")
@@ -105,5 +102,7 @@ def get_order(order_id: str):
 
 @app.get("/api/events")
 def events():
-    """Test-only event inspection endpoint for local integration tests."""
-    return EVENTS
+    """Test-only endpoint for inspecting events when memory publishing is enabled."""
+    if isinstance(publisher, InMemoryEventPublisher):
+        return publisher.events
+    return {"mode": "kafka", "topic": "orders"}
