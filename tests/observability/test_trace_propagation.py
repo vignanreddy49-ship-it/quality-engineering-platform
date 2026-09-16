@@ -14,14 +14,13 @@ def test_w3c_trace_context_round_trips_through_headers():
         trace_flags=TraceFlags(TraceFlags.SAMPLED),
     )
     context = trace.set_span_in_context(NonRecordingSpan(span_context))
-    token = trace.use_span(NonRecordingSpan(span_context), end_on_exit=False)
+    token = trace.attach(context)
     try:
         headers = inject_trace_headers()
         assert headers["traceparent"].startswith("00-1234567890abcdef1234567890abcdef-")
         extracted = extract_trace_headers(headers)
         assert extracted is not None
     finally:
-        _ = context
         trace.detach(token)
 
 
