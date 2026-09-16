@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shopsphere://events/order-created/v1",
+  "title": "ShopSphere order.created v1",
+  "type": "object",
+  "required": ["event_id", "event_type", "event_version", "occurred_at", "aggregate_id", "payload"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "enum": ["order.created"]},
+    "event_version": {"type": "integer", "const": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "aggregate_id": {"type": "string", "pattern": "^o-[a-z0-9]+$"},
+    "payload": {
+      "type": "object",
+      "required": ["order_id", "customer_email", "total", "status"],
+      "properties": {
+        "order_id": {"type": "string"},
+        "customer_email": {"type": "string", "format": "email"},
+        "total": {"type": "number", "minimum": 0},
+        "status": {"type": "string", "enum": ["CREATED"]}
+      }
+    }
+  }
+}
