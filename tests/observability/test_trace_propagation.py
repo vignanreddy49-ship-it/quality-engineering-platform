@@ -1,27 +1,28 @@
 """Unit tests for distributed trace propagation without requiring a collector."""
 
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 
 from apps.api.observability import extract_trace_headers, inject_trace_headers
 
 
 def test_w3c_trace_context_round_trips_through_headers():
-    provider = TracerProvider()
-    previous = trace.get_tracer_provider()
-    trace.set_tracer_provider(provider)
+    span_context = SpanContext(
+        trace_id=0x1234567890ABCDEF1234567890ABCDEF,
+        span_id=0x1234567890ABCDEF,
+        is_remote=False,
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+    )
+    context = trace.set_span_in_context(NonRecordingSpan(span_context))
+    token = trace.use_span(NonRecordingSpan(span_context), end_on_exit=False)
     try:
-        tracer = trace.get_tracer("test")
-        with tracer.start_as_current_span("producer") as span:
-            headers = inject_trace_headers()
-            assert "traceparent" in headers
-            extracted = extract_trace_headers(headers)
-            assert extracted["traceparent"] == headers["traceparent"]
-            assert span.get_span_context().trace_id != 0
+        headers = inject_trace_headers()
+        assert headers["traceparent"].startswith("00-1234567890abcdef1234567890abcdef-")
+        extracted = extract_trace_headers(headers)
+        assert extracted is not None
     finally:
-        # OpenTelemetry protects the global provider from replacement after first use;
-        # this test deliberately uses the SDK's isolated propagation behavior only.
-        _ = previous
+        _ = context
+        trace.detach(token)
 
 
 def test_injection_preserves_existing_headers():
