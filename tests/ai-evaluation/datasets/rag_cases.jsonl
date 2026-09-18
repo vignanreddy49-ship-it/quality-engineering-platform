@@ -1,0 +1,4 @@
+{"id":"order-status","question":"What is the order status?","context":"Order o-123 has status CREATED and total 49.99.","expected_topics":["status","CREATED"],"reference_answer":"The order status is CREATED."}
+{"id":"inventory","question":"Is the item available?","context":"Product p-100 is in stock with available quantity 12.","expected_topics":["available","quantity"],"reference_answer":"The item is available with quantity 12."}
+{"id":"payment","question":"What payment outcome is recorded?","context":"Payment authorization for order o-123 was accepted.","expected_topics":["payment","accepted"],"reference_answer":"The payment authorization was accepted."}
+{"id":"customer","question":"Which customer email is on the order?","context":"Order o-456 belongs to customer@example.com.","expected_topics":["customer@example.com"],"reference_answer":"The customer email is customer@example.com."}
