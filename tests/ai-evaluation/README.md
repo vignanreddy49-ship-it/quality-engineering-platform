@@ -1,25 +1,16 @@
 # AI / LLM Quality Engineering
 
-This layer demonstrates a model-agnostic approach to validating AI-enabled applications.
+This layer demonstrates a model-agnostic quality strategy for AI-enabled applications.
 
-## Evaluation layers
-
-| Layer | What is validated |
+| Layer | Validation |
 |---|---|
-| Relevance | Expected topics are covered by the answer |
-| Groundedness | Answer content is supported by retrieved context |
-| Safety | Prompt-injection attempts do not expose secrets or internal instructions |
-| Agent workflow | Tool sequence, correlation and failure handling |
-| Regression dataset | Known questions and expected behavior remain stable |
+| RAG dataset | Questions, context, expected topics and reference answers |
+| Relevance | Expected topics are covered |
+| Groundedness | Answer content overlaps retrieved context |
+| Safety | Prompt injection, jailbreak, exfiltration and tool-misuse regressions |
+| LLM-as-a-judge | Swappable judge contract with deterministic CI implementation |
+| Agent workflow | Ordered tool calls, correlation and evidence hygiene |
 
-The deterministic evaluator intentionally requires no model API key. A production adapter can replace the reference answer with a real model response while retaining the same quality-gate interface.
+CI is offline and deterministic. Production adapters can connect an approved model gateway while retaining the same evaluation contract.
 
-## Production extensions
-
-- LLM-as-a-judge adapter with calibration set
-- Ragas / DeepEval / promptfoo integration
-- Langfuse trace ingestion
-- Retrieval precision/recall and citation correctness
-- Jailbreak and indirect prompt-injection corpus
-- Token/cost and latency budgets
-- CI failure artifacts containing prompt, retrieved context, response and evaluation evidence
+Production extensions include calibrated LLM judges, retrieval precision/recall, citation correctness, indirect injection corpora, tool authorization checks, cost/latency budgets and trace evidence artifacts.
